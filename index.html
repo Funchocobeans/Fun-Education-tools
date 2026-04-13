@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深度创造力潜能评估测试 (50题专业版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; line-height: 1.6; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 8px 15px rgba(0,0,0,0.05); }
+        h1, h2 { text-align: center; color: #2c3e50; }
+        p.intro { text-align: center; color: #7f8c8d; margin-bottom: 30px; font-size: 0.95em;}
+        .progress-bar { position: sticky; top: 0; background: rgba(255,255,255,0.95); padding: 10px 0; text-align: center; font-weight: bold; color: #3498db; border-bottom: 1px solid #eee; z-index: 100; margin-bottom: 20px;}
+        .question-block { margin-bottom: 25px; padding: 20px; background: #fafafa; border-radius: 8px; border-left: 5px solid #3498db; transition: all 0.3s; }
+        .question-block:hover { background: #f0f7fb; }
+        .question-text { font-weight: bold; margin-bottom: 15px; font-size: 1.05em;}
+        .options-container { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;}
+        .option-label { display: flex; align-items: center; cursor: pointer; font-size: 0.9em; padding: 8px; border-radius: 5px; background: #fff; border: 1px solid #e0e0e0; flex: 1; text-align: center; justify-content: center; transition: background 0.2s;}
+        .option-label:hover { background: #e8f4fd; border-color: #3498db;}
+        .option-label input { display: none; }
+        /* 自定义选中样式 */
+        .option-label input:checked + span { color: #3498db; font-weight: bold; }
+        .option-label:has(input:checked) { background: #e8f4fd; border-color: #3498db; border-width: 2px;}
+
+        .btn-submit, .btn-retry { display: block; width: 100%; padding: 15px; background-color: #3498db; color: white; border: none; border-radius: 8px; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: background 0.3s; margin-top: 20px;}
+        .btn-submit:hover, .btn-retry:hover { background-color: #2980b9; }
+        #results-screen { display: none; }
+        .score-summary { text-align: center; margin: 20px 0; font-size: 1.5em; font-weight: bold; color: #e74c3c; }
+        .feedback-text { background: #fdfefe; padding: 25px; border-radius: 8px; margin-top: 20px; border: 1px solid #eee;}
+        .feedback-text h3 { color: #2c3e50; margin-top: 0;}
+        .chart-container { position: relative; height: 450px; width: 100%; display: flex; justify-content: center; margin-top: 20px;}
+    </style>
+</head>
+<body>
+
+<div class="container" id="app-container">
+    
+    <div id="test-screen">
+        <h1>深度创造力潜能评估 (50题专业版)</h1>
+        <p class="intro">融合 TTCT (托兰斯) 与 WKCT (瓦拉赫-科根) 理论模型<br>请放松大脑，凭借第一直觉选择最符合您日常状态的选项</p>
+        
+        <div class="progress-bar" id="progress-indicator">已答: 0 / 50 题</div>
+
+        <form id="quiz-form">
+            <div id="questions-container"></div>
+            <button type="button" class="btn-submit" onclick="calculateResults()">提交问卷，生成评估报告</button>
+        </form>
+    </div>
+
+    <div id="results-screen">
+        <h2>您的创造力认知评估报告</h2>
+        <div class="score-summary" id="total-score-display">综合创造力指数: 0 / 100</div>
+        
+        <div class="chart-container">
+            <canvas id="radarChart"></canvas>
+        </div>
+
+        <div class="feedback-text" id="feedback-display">
+            </div>
+
+        <button class="btn-retry" onclick="resetTest()">重新测试</button>
+    </div>
+
+</div>
+
+<script>
+    // 题目数据库 (50题完整版)
+    // 维度: 1-流畅性与变通性(13题), 2-独创性(13题), 3-好奇心与冒险精神(12题), 4-精细性(12题)
+    const questions = [
+        // 维度 1: 流畅性与变通性 (Fluency & Flexibility)
+        { id: 1, text: "当常规方法行不通时，我总能像条件反射一样迅速找到替代方案。", dimension: 1 },
+        { id: 2, text: "发呆或散步时，我脑海里经常会源源不断地迸发出新灵感。", dimension: 1 },
+        { id: 3, text: "在头脑风暴中，我通常是那个能源源不断抛出点子的人。", dimension: 1 },
+        { id: 4, text: "当看到一个普通的废旧纸箱，我能瞬间想出它除了装东西外的至少五种非传统用途。", dimension: 1 },
+        { id: 5, text: "我很擅长把两个看似完全不相关的事物（比如冰箱和跑鞋）组合成一个新概念。", dimension: 1 },
+        { id: 6, text: "面对突发状况，我能迅速调整甚至推翻原计划，而不是陷入焦虑和僵局。", dimension: 1 },
+        { id: 7, text: "我经常能在不同领域的知识（比如科学原理与艺术创作）之间跳跃并产生奇妙的联系。", dimension: 1 },
+        { id: 8, text: "讨论问题时，如果有人反驳我，我能立刻换一个完全不同的角度重新阐述我的观点。", dimension: 1 },
+        { id: 9, text: "我常常觉得脑子里的想法太多跳跃太快，以至于笔头或嘴巴跟不上思维的速度。", dimension: 1 },
+        { id: 10, text: "如果让我列举一个回形针的用途，只要时间足够，我能轻松写出十几条甚至几十条。", dimension: 1 },
+        { id: 11, text: "环境哪怕发生微小的改变，也能迅速触发我产生大量相关的联想。", dimension: 1 },
+        { id: 12, text: "我不喜欢死磕一个无效的办法，如果路走不通，我会立刻绕道而行。", dimension: 1 },
+        { id: 13, text: "我经常能在极短的时间内，对同一个问题给出三种截然不同的解决方案。", dimension: 1 },
+
+        // 维度 2: 独创性 (Originality)
+        { id: 14, text: "我喜欢尝试用别人压根没想过的新方法做事，即便旧方法很安全。", dimension: 2 },
+        { id: 15, text: "我的想法有时会被周围的人觉得“古怪”、“脱线”或“不切实际”。", dimension: 2 },
+        { id: 16, text: "我极度反感墨守成规，总有一种想打破常规和固定思维的冲动。", dimension: 2 },
+        { id: 17, text: "我经常对同一件事有与众不同的看法，即使这让我显得不太合群。", dimension: 2 },
+        { id: 18, text: "我更倾向于把生活或事业看作是一场没有绝对输赢的“无限游戏”，重点是探索边界。", dimension: 2 },
+        { id: 19, text: "面对权威给出的“标准答案”，我内心的第一反应通常是质疑它是否唯一。", dimension: 2 },
+        { id: 20, text: "我不喜欢使用现成的模板套路，更喜欢从零开始构建完全属于自己的东西。", dimension: 2 },
+        { id: 21, text: "别人觉得完美的设计或制度，我总能敏锐地挑出毛病并提出颠覆性的替代方案。", dimension: 2 },
+        { id: 22, text: "我觉得“好玩且新颖”比“有用且平庸”更重要，经常做一些看似无用但极具趣味的思考。", dimension: 2 },
+        { id: 23, text: "在创作或表达时，我极力避免使用别人用过的陈词滥调和网络爆款梗。", dimension: 2 },
+        { id: 24, text: "解决问题时，我更追求方案的“巧妙感”和“惊喜感”，而不仅仅是为了完成任务。", dimension: 2 },
+        { id: 25, text: "我经常使用幽默、荒诞或隐喻的方式来传达我内心真实的观点。", dimension: 2 },
+        { id: 26, text: "创造出独一无二的作品（一篇文章、一个视频或一个概念）能给我带来极致的内在满足感。", dimension: 2 },
+
+        // 维度 3: 好奇心与冒险精神 (Curiosity & Risk-taking)
+        { id: 27, text: "我对未知事物充满强烈的好奇，总想探究事物背后的底层逻辑，而不仅是表面现象。", dimension: 3 },
+        { id: 28, text: "我愿意为了尝试一个绝妙的新想法而承担试错的成本，我不害怕失败。", dimension: 3 },
+        { id: 29, text: "遇到真正感兴趣却不懂的问题，我一定会追根究底，甚至废寝忘食地去查资料。", dimension: 3 },
+        { id: 30, text: "我更喜欢挑战那些具有高难度和不确定性的任务，一成不变的工作会让我枯萎。", dimension: 3 },
+        { id: 31, text: "相比于被动接受外部安排，我完全由内在驱动去主动探索新课题时效率最高。", dimension: 3 },
+        { id: 32, text: "我经常阅读或学习与我当前主业完全无关的跨学科知识。", dimension: 3 },
+        { id: 33, text: "去一个陌生的城市，我更喜欢不带地图地随性漫游，而不是严格跟着网红攻略走。", dimension: 3 },
+        { id: 34, text: "我常常向别人（或自己）提出一些看似“幼稚”或“天马行空”的“为什么”。", dimension: 3 },
+        { id: 35, text: "在没有明确指导或“标准操作流程(SOP)”的情况下，我依然能自如甚至兴奋地开展探索。", dimension: 3 },
+        { id: 36, text: "我愿意放弃部分眼前的安全感，去追求一个我认为极具潜力的创新念头。", dimension: 3 },
+        { id: 37, text: "看到新奇的科技产品、软件或新锐书籍，我总是忍不住想第一批上手研究一下。", dimension: 3 },
+        { id: 38, text: "我相信大脑的神经可塑性，坚信只要保持探索，任何年龄都能重新塑造自己的能力边界。", dimension: 3 },
+
+        // 维度 4: 精细性 (Elaboration)
+        { id: 39, text: "当我脑海中闪过一个好点子时，我会不由自主地在脑海里反复丰富和推演它的细节。", dimension: 4 },
+        { id: 40, text: "我能把一个极其简单的草图或模糊的概念，一步步发展成逻辑严密的复杂系统。", dimension: 4 },
+        { id: 41, text: "在执行一个创意计划时，我非常注重步骤的合理性、颗粒度以及细节的完美呈现。", dimension: 4 },
+        { id: 42, text: "我喜欢对现有的事物进行微调和迭代改造，使其用户体验或效率变得更好。", dimension: 4 },
+        { id: 43, text: "我在向别人描述我的想法时，往往能提供非常生动、具象且丰富的感官细节。", dimension: 4 },
+        { id: 44, text: "看电影或读书时，我特别关注创作者在背景、隐喻或微小道具上埋下的伏笔。", dimension: 4 },
+        { id: 45, text: "给别人提建议时，我不只会说“你应该怎么做”，还会自然而然帮他规划出具体的1、2、3步。", dimension: 4 },
+        { id: 46, text: "一旦开始打磨一个作品（如文章、视频脚本或方案），我常常会为了一个词或一个转场反复修改。", dimension: 4 },
+        { id: 47, text: "我始终认为：一个伟大的创意，如果没有极其精细和严谨的执行，就只是一句空话。", dimension: 4 },
+        { id: 48, text: "布置房间或整理桌面时，我不仅考虑美观，还会深入推敲日常动线和使用习惯的微小细节。", dimension: 4 },
+        { id: 49, text: "当别人提出一个宏大的愿景时，我的大脑会自动开始将其拆解为可落地的具体资源和步骤。", dimension: 50 }, // Note: id should be 49, dimension 4
+        { id: 50, text: "我非常擅长在纷繁复杂、碎片化的信息中，抽丝剥茧，梳理出一条极其清晰严谨的逻辑线。", dimension: 4 }
+    ];
+    
+    // 修正上一行数据的小笔误
+    questions[48].dimension = 4;
+
+    const options = [
+        { value: 1, label: "完全不符合" },
+        { value: 2, label: "不太符合" },
+        { value: 3, label: "一般符合" },
+        { value: 4, label: "比较符合" },
+        { value: 5, label: "完全符合" }
+    ];
+
+    let radarChartInstance = null;
+
+    // 渲染题目
+    function renderQuestions() {
+        const container = document.getElementById('questions-container');
+        container.innerHTML = '';
+        
+        questions.forEach((q, index) => {
+            const block = document.createElement('div');
+            block.className = 'question-block';
+            
+            const title = document.createElement('div');
+            title.className = 'question-text';
+            title.innerText = `${index + 1}. ${q.text}`;
+            block.appendChild(title);
+
+            const optsContainer = document.createElement('div');
+            optsContainer.className = 'options-container';
+
+            options.forEach(opt => {
+                const label = document.createElement('label');
+                label.className = 'option-label';
+                // 添加 onclick 事件来更新进度条
+                label.innerHTML = `
+                    <input type="radio" name="q${q.id}" value="${opt.value}" onchange="updateProgress()"> 
+                    <span>${opt.label}</span>
+                `;
+                optsContainer.appendChild(label);
+            });
+
+            block.appendChild(optsContainer);
+            container.appendChild(block);
+        });
+    }
+
+    // 更新进度条
+    function updateProgress() {
+        const form = document.getElementById('quiz-form');
+        let answeredCount = 0;
+        questions.forEach(q => {
+            if (form.querySelector(`input[name="q${q.id}"]:checked`)) {
+                answeredCount++;
+            }
+        });
+        document.getElementById('progress-indicator').innerText = `已答: ${answeredCount} / 50 题`;
+    }
+
+    // 计算结果
+    function calculateResults() {
+        const form = document.getElementById('quiz-form');
+        
+        // 记录各维度原始分
+        let rawScores = { 1: 0, 2: 0, 3: 0, 4: 0 };
+        // 记录各维度题目数量
+        const dimCounts = { 1: 13, 2: 13, 3: 12, 4: 12 };
+        let answeredCount = 0;
+
+        questions.forEach(q => {
+            const selected = form.querySelector(`input[name="q${q.id}"]:checked`);
+            if (selected) {
+                rawScores[q.dimension] += parseInt(selected.value);
+                answeredCount++;
+            }
+        });
+
+        if (answeredCount < questions.length) {
+            alert(`您还有 ${questions.length - answeredCount} 道题未作答，请完成后再提交哦！`);
+            return;
+        }
+
+        // 计算总分 (百分制归一化: (总原始分 / 满分250) * 100)
+        const totalRawScore = rawScores[1] + rawScores[2] + rawScores[3] + rawScores[4];
+        const normalizedTotal = Math.round((totalRawScore / 250) * 100);
+
+        // 计算各维度百分制得分 (原始分 / 该维度满分) * 100
+        const percentageScores = [
+            Math.round((rawScores[1] / (dimCounts[1] * 5)) * 100),
+            Math.round((rawScores[2] / (dimCounts[2] * 5)) * 100),
+            Math.round((rawScores[3] / (dimCounts[3] * 5)) * 100),
+            Math.round((rawScores[4] / (dimCounts[4] * 5)) * 100)
+        ];
+        
+        showResults(normalizedTotal, percentageScores);
+    }
+
+    // 显示结果和图表
+    function showResults(total, pctScores) {
+        document.getElementById('test-screen').style.display = 'none';
+        document.getElementById('results-screen').style.display = 'block';
+        window.scrollTo(0, 0);
+        
+        document.getElementById('total-score-display').innerText = `综合创造力认知指数: ${total} / 100`;
+
+        const dimNames = ["流畅性与变通性", "独创性", "好奇心与冒险精神", "精细性"];
+        const maxScore = Math.max(...pctScores);
+        const bestDimIndex = pctScores.indexOf(maxScore);
+        
+        const feedbacks = [
+            "🧠 **你的【流畅性与变通性】最为突出。**<br><br>你的大脑默认模式网络非常活跃。在面对问题时，你能够突破单一路径依赖，迅速进行思维重组和发散。你是典型的'发散型思考者'，不仅点子多，而且懂得变通。当别人撞上南墙时，你已经想好了绕过去的五条不同路线。在团队中，你是打破僵局的灵感引擎。",
+            "✨ **你的【独创性】最为突出。**<br><br>你具有极其罕见的独立思考能力，甚至带着一丝迷人的'反叛精神'。你不满足于标准答案，倾向于将生活看作一场'无限游戏'。你能够敏锐地捕捉到常规事物中的荒谬之处，并重构出属于你自己的、颠覆性的独特表达。适合从事高度强调原创性、艺术感和颠覆式创新的领域。",
+            "🔭 **你的【好奇心与冒险精神】最为突出。**<br><br>你的内在驱动力极强！面对未知，你的第一反应不是恐惧，而是兴奋。你不畏惧试错，因为你潜意识里深知神经可塑性的力量——一切皆可学习。强烈的求知欲让你不断探索舒适区之外的领域，这种纯粹的、自发的好奇心，正是所有伟大科学发现和个人成长的基石。",
+            "📐 **你的【精细性】最为突出。**<br><br>你不仅是一个仰望星空的人，更是一个脚踏实地的构建者。许多人有绝佳的点子，但只有你能将它们落地。你的大脑极其擅长逻辑拆解和细节丰满，能够把粗糙的概念打磨成无可挑剔的系统性成品。你对细节的极致把控和深度的执行力，是你将创造力转化为现实价值的最强武器。"
+        ];
+
+        document.getElementById('feedback-display').innerHTML = `
+            <h3>深度维度解析</h3>
+            <p style="font-size: 1.1em; line-height: 1.8;">${feedbacks[bestDimIndex]}</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #7f8c8d; font-size: 0.9em;">* 注：创造力并非固定不变的特质。根据认知科学，人类的大脑具有终身可塑性。了解自己的优势维度后，您可以通过跨领域学习和刻意练习，持续点亮其他维度的技能树。</p>
+        `;
+
+        // 绘制雷达图
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        
+        if (radarChartInstance) {
+            radarChartInstance.destroy();
+        }
+
+        radarChartInstance = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: dimNames,
+                datasets: [{
+                    label: '您的各项维度潜能 (百分制)',
+                    data: pctScores,
+                    backgroundColor: 'rgba(52, 152, 219, 0.25)',
+                    borderColor: 'rgba(52, 152, 219, 1)',
+                    pointBackgroundColor: 'rgba(231, 76, 60, 1)',
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: 'rgba(231, 76, 60, 1)',
+                    borderWidth: 2,
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: { display: true, color: 'rgba(0,0,0,0.1)' },
+                        grid: { color: 'rgba(0,0,0,0.1)' },
+                        suggestedMin: 0,
+                        suggestedMax: 100,
+                        ticks: {
+                            stepSize: 20,
+                            backdropColor: 'transparent'
+                        },
+                        pointLabels: {
+                            font: { size: 14, weight: 'bold' },
+                            color: '#2c3e50'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: { position: 'bottom' }
+                }
+            }
+        });
+    }
+
+    // 重新测试
+    function resetTest() {
+        document.getElementById('quiz-form').reset();
+        document.getElementById('results-screen').style.display = 'none';
+        document.getElementById('test-screen').style.display = 'block';
+        updateProgress(); // 重置进度条
+        window.scrollTo(0, 0);
+    }
+
+    // 初始化运行
+    window.onload = renderQuestions;
+</script>
+
+</body>
+</html>
